@@ -1,6 +1,9 @@
 package com.ai.virtusa.operator;
 
+import android.content.Context;
+
 import com.ai.virtusa.operator.UI.Message;
+import com.ai.virtusa.operator.UI.MessageAdapter;
 
 import java.util.ArrayList;
 
@@ -11,11 +14,12 @@ public class User {
     String Topic;
     String name;
     public ArrayList<Message> messages;
-
-    public User(String Topic, String name){
+    public MessageAdapter adapter;
+    public User(String Topic, String name,Context con){
         this.Topic = Topic;
         this.name = name;
         messages= new ArrayList<Message>();
+        adapter = new MessageAdapter(con,this);
     }
 
     public ArrayList<Message> getMessages(){

@@ -20,18 +20,22 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.ai.virtusa.operator.UI.MessageAdapter;
+
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 public class MainActivity extends AppCompatActivity implements MqttCallback{
 
-    MqttAndroidClient client;
+    public static MqttClient client;
 
     private ListView mDrawerList;
     private String[] mPlanetTitles;
@@ -41,7 +45,7 @@ public class MainActivity extends AppCompatActivity implements MqttCallback{
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        new Toast(getApplicationContext()).makeText(getApplicationContext(), "Proceeding with connection", Toast.LENGTH_LONG);
+        new Toast(getApplicationContext()).makeText(getApplicationContext(), "Proceeding with connection", Toast.LENGTH_LONG).show();
         connect();
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -59,9 +63,8 @@ public class MainActivity extends AppCompatActivity implements MqttCallback{
         mPlanetTitles = getResources().getStringArray(R.array.planets_array);
         mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
         mDrawerList = (ListView) findViewById(R.id.left_drawer);
-
-        mDrawerList.setAdapter(new ArrayAdapter<String>(this,
-                android.R.layout.simple_list_item_1, Utility.topics));
+        Utility.adapter2 = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1,Utility.topics);
+        mDrawerList.setAdapter(Utility.adapter2);
         // Set the list's click listener
         mDrawerList.setOnItemClickListener(new DrawerItemClickListener());
 
@@ -94,17 +97,19 @@ public class MainActivity extends AppCompatActivity implements MqttCallback{
     }
 
     public boolean connect(){
+        MemoryPersistence persistance = new MemoryPersistence();
 
-        MqttConnectOptions conpt = new MqttConnectOptions();
-        conpt.setCleanSession(false);
-        conpt.setConnectionTimeout(60);
-        conpt.setKeepAliveInterval(200);
-        ActionListener listener = new ActionListener();
-        listener.setCon(getApplicationContext());
-        client = new MqttAndroidClient(getApplicationContext(), "172.22.228.25","AQEEL");
-        new Toast(getApplicationContext()).makeText(getApplicationContext(),"Connecting",Toast.LENGTH_LONG);
         try {
-            client.connect(conpt, null,listener);
+            client = new MqttClient("tcp://172.22.228.25:1883","AQEELOP",persistance);
+        } catch (MqttException e) {
+            e.printStackTrace();
+        }
+        new Toast(getApplicationContext()).makeText(getApplicationContext(),"Connecting",Toast.LENGTH_LONG).show();
+        try {
+            client.setCallback(this);
+            client.connect();
+            client.subscribe("chat/+");
+            new Toast(getApplicationContext()).makeText(getApplicationContext(),"Connected",Toast.LENGTH_LONG).show();
         } catch (MqttException e) {
             e.printStackTrace();
         }
@@ -149,9 +154,24 @@ public class MainActivity extends AppCompatActivity implements MqttCallback{
     }
 
     @Override
-    public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
-        if(!Utility.topics.contains(topic))
-            Utility.topics.add(topic);
+    public void messageArrived(final String topic, MqttMessage mqttMessage) throws Exception {
+        final String result[] = JSONFormatController.readJSONmessage(mqttMessage.toString());
+        if(!Utility.topics.contains(result[1])) {
+            this.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Utility.topics.add(result[1]);
+                    Utility.adapter2.notifyDataSetChanged();
+                    mDrawerList.setSelection(Utility.topics.size() - 1);
+                    for(int i=0;i<Utility.topics.size();i++)
+                        System.out.println(Utility.topics.get(i));
+                }
+            });
+
+        }
+
+        if(!Utility.topicUserList.containsKey(topic))
+            Utility.topicUserList.put(topic, new User(topic,result[1],getApplicationContext()));
     }
 
     @Override
